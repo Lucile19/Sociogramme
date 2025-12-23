@@ -1,0 +1,892 @@
+
+```{r}
+??igraph
+```
+
+```{r}
+install.packages("igraph")
+```
+
+
+terminologie (verteces) https://fr.wikipedia.org/wiki/Sommet_(g%C3%A9om%C3%A9trie)
+
+More details on dependencies, requirements, and troubleshooting on installation are found on the main documentation page.https://r.igraph.org/
+# Package
+```{r}
+library(igraph)
+library(magrittr)
+```
+
+# Différentes manière de créer graphique
+
+## Make empty graph
+```{r}
+
+g <- make_empty_graph()
+g
+```
+
+The most common way to create a graph is make_graph(), which constructs a network based on specified edges. For example, to make a graph with 10 nodes (numbered 1 to 10) and two edges connecting nodes 1-2 and 1-5:
+
+## Make graph
+```{r}
+g <- make_graph(edges = c(1, 2, 1, 5), n = 10, directed = FALSE)
+summary(g)
+plot(g, layout=layout_nicely)
+
+```
+The same function make_graph() can create some notable graphs by just specifying their name. For example you can create the graph that represents the social network of Zachary’s karate club, that shows the friendship between 34 members of a karate club at a US university in the 1970s:
+```{r}
+g <- make_graph("Zachary")
+plot(g)
+```
+
+### social networks with attributes
+```{r}
+att <- make_graph(
+  ~ Alice - Boris:Himari:Moshe, Himari - Alice:Nang:Moshe:Samira,
+  Ibrahim - Nang:Moshe, Nang - Samira
+)
+plot(att)
+
+```
+#### V et E
+Each vertex represents a person, so we want to store ages, genders and types of connection between two people (is_formal() refers to whether a connection between one person or another is formal or informal, respectively colleagues or friends). The $ operator is a shortcut to get and set graph attributes. It is shorter and just as readable as graph_attr() and set_graph_attr().
+
+```{r}
+V(att)$age <- c(25, 31, 18, 23, 47, 22, 50)
+V(att)$gender <- c("f", "m", "f", "m", "m", "f", "m")
+E(att)$is_formal <- c(FALSE, FALSE, TRUE, TRUE, TRUE, FALSE, TRUE, FALSE, FALSE)
+summary(att)
+plot(att)
+```
+V() and E() are the standard way to obtain a sequence of all vertices and edges, respectively. This assigns an attribute to all vertices/edges at once.
+
+To assign or modify an attribute for a single vertex/edge:
+```{r}
+E(g)$is_formal
+```
+
+```{r}
+E(g)$is_formal[1] <- TRUE
+E(g)$is_formal
+```
+
+#### set vertex attr et set edge attr:
+
+Another way to generate our social network is with the use of set_vertex_attr() and set_edge_attr() and the operator %>%:
+```{r}
+att <- make_graph(
+  ~ Alice - Boris:Himari:Moshe, Himari - Alice:Nang:Moshe:Samira,
+  Ibrahim - Nang:Moshe, Nang - Samira
+) %>%
+  set_vertex_attr("age", value = c(25, 31, 18, 23, 47, 22, 50)) %>%
+  set_vertex_attr("gender", value = c("f", "m", "f", "m", "m", "f", "m")) %>%
+  set_edge_attr("is_formal", value = c(FALSE, FALSE, TRUE, TRUE, TRUE, FALSE, TRUE, FALSE, FALSE))
+summary(att)
+```
+
+#### assigner att autres
+Attribute values can be set to any R object, but note that storing the graph in some file formats might result in the loss of complex attribute values. Vertices, edges and the graph itself can all be used to set attributes, for instance to add a date to the graph
+```{r}
+g$date <- c("2022-02-11")
+graph_attr(g, "date")
+```
+To assign attributes to a subset of vertices or edges, you can use:
+```{r}
+V(g)$name[1:3] <- c("Alejandra", "Bruno", "Carmina")
+V(g)
+```
+
+
+## Graph from literal
+
+(voir chordal graph)
+```{r}
+g1 <- graph_from_literal(
+  A - B:C:I, B - A:C:D,
+  C - A:B:E:H,
+  D - B:E:F,
+  E - C:D:F:H,
+  F - D:E:G,
+  G - F:H,
+  H - C:E:G:I,
+  I - A:H
+)
+plot(g1)
+```
+
+## Make tree (always same)
+This generates a regular tree graph with 127 vertices, each vertex having two children. No matter how many times you call make_tree(), the generated graph will always be the same if you use the same parameters:
+
+```{r}
+graph1 <- make_tree(127, 2, mode = "undirected")
+summary(graph1)
+plot(graph1)
+```
+### comparer graph
+(ici montre que si tu utilises les m^mes paramètres les graph générés seront toujours les mêmes)
+```{r}
+graph2 <- make_tree(127, 2, mode = "undirected")
+identical_graphs(graph1, graph2)
+
+```
+
+## sample grg
+Other functions generate graphs stochastically, which means they produce a different graph each time. For instance sample_grg():
+```{r}
+graph1 <- sample_grg(100, 0.2)
+summary(graph1)
+plot(graph1)
+```
+
+# Gérer le graph
+## Ajouter des Vertex (noeuds) et des edges (liens)
+Let’s continue working with the Karate club graph. To add one or more vertices to an existing graph, use add_vertices():
+```{r}
+g <- add_vertices(g, 3)
+plot(g)
+```
+Similarly, to add edges you can use add_edges():
+Edges are added by specifying the source and target vertex IDs for each edge. This call added three edges, one connecting vertices 1 and 35, one connecting vertices 1 and 36, and one connecting vertices 34 and 37.
+```{r}
+g <- add_edges(g, edges = c(1, 35, 1, 36, 34, 37))
+plot(g)
+```
+
+In addition to the add_vertices() and add_edges() functions, the plus operator can be used to add vertices or edges to graph. The actual operation that is performed depends on the type of the right hand side argument:
+
+```{r}
+g <- g + edges(c(1, 35, 1, 36, 34, 37))
+plot(g)
+```
+You can add a single vertex/edge at a time using add_vertex() and add_edge() (singular).
+
+Warning: If you need to add multiple edges to a graph, it is much more efficient to call add_edges() once rather than repeatedly calling add_edge() with a single new edge. The same applies when deleting edges and vertices.
+
+If you try to add edges to vertices with invalid IDs (i.e., you try to add an edge to vertex 38 when the graph has only 37 vertices), igraph shows an error:
+```{r}
+g <- add_edges(g, edges = c(38, 37))
+```
+Let us add some more vertices and edges to our graph. In igraph we can use the magrittr package, which provides a mechanism for chaining commands with the operator
+
+
+```{r}
+g <- g %>%
+  add_edges(edges = c(1, 34)) %>%
+  add_vertices(3) %>%
+  add_edges(edges = c(38, 39, 39, 40, 40, 38, 40, 37))
+g
+plot(g)
+```
+## Supprimer edge
+We now have an undirected graph with 40 vertices and 86 edges. Vertex and edge IDs are always contiguous, so if you delete a vertex all subsequent vertices will be renumbered. When a vertex is renumbered, edges are not renumbered, but their source and target vertices will be. Use delete_vertices() and delete_edges() to perform these operations. For instance, to delete the edge connecting vertices 1-34, get its ID and then delete it:
+```{r}
+edge_id_to_delete <- get_edge_ids(g, c(1, 34))
+edge_id_to_delete
+```
+
+
+```{r}
+g <- delete_edges(g, edge_id_to_delete)
+plot(g)
+```
+# Types de graphs spéciaux
+## Broken ring
+s an example, to create a broken ring:
+```{r}
+g <- make_ring(10) %>% delete_edges("10|1")
+plot(g)
+
+```
+The example above shows that you can also refer to edges with strings containing the IDs of the source and target vertices, connected by a pipe symbol |. "10|1" in the above example means the edge that connects vertex 10 to vertex 1. Of course you can also use the edge IDs directly, or retrieve them with the get_edge_ids() function:
+
+```{r}
+g <- make_ring(5)
+g <- delete_edges(g, get_edge_ids(g, c(1, 5, 4, 5)))
+plot(g)
+```
+# Chordal
+As another example, let’s make a chordal graph. Remember that a graph is chordal (or triangulated) if each of its cycles of four or more nodes has a chord, which is an edge joining two nodes that are not adjacent in the cycle. First, let’s create the initial graph using graph_from_literal():
+
+```{r}
+g1 <- graph_from_literal(
+  A - B:C:I, B - A:C:D,
+  C - A:B:E:H,
+  D - B:E:F,
+  E - C:D:F:H,
+  F - D:E:G,
+  G - F:H,
+  H - C:E:G:I,
+  I - A:H
+)
+plot(g1)
+```
+
+In the example above, the : operator was used to define vertex sets. If an edge operator connects two vertex sets, then every vertex from the first set will be connected to every vertex in the second set. Then we use is_chordal() to evaluate if our graph is chordal and to search what edges are missing to fill-in the graph:
+```{r}
+is_chordal(g1, fillin = TRUE)
+
+```
+We can then add the edges required to make the initial graph chordal in a single line:
+
+
+```{r}
+chordal_graph <- add_edges(g1, is_chordal(g1, fillin = TRUE)$fillin)
+plot(chordal_graph)
+```
+
+
+# Fonctions utiles
+## comparer des graphiques
+```{r}
+identical_graphs(graph1, graph2)#renvoie un bool
+```
+A slightly looser way to check if the graphs are equivalent is via isomorphic. Two graphs are said to be isomorphic if they have the same number of components (vertices and edges) and maintain a one-to-one correspondence between vertices and edges, that is to say, they are connected in the same way.
+
+```{r}
+isomorphic(graph1, graph2) #renvoie bool
+
+```
+Checking for isomorphism can take a while for large graphs (in this case, the answer can quickly be given by checking the degree sequence of the two graphs). identical_graph() is a stricter criterion than isomorphic(): the two graphs must have the same list of vertices and edges, in exactly the same order, with same directedness, and the two graphs must also have identical graph, vertex and edge attributes.
+
+## retrieve/delete attributes
+Voir social networks with attributes
+
+To retrieve attributes, you can also use graph_attr(), vertex_attr(), and edge_attr(). To find the ID of a vertex you can use the function match():
+```{r}
+match(c("Ibrahim"), V(att)$name)
+```
+
+To delete attributes:
+```{r}
+g <- delete_vertex_attr(g, "gender")
+V(g)$gender
+```
+
+
+
+## select edges and vetrices
+Of course, it is possible to select vertices or edges by positional indices:
+```{r}
+seq <- V(graph)[2, 3, 7]
+seq
+```
+```{r}
+seq <- seq[1, 3] # filtering an existing vertex set
+seq
+```
+
+Attribute names can also be used as-is within the indexing brackets of V() and E(). This can be combined with R’s ability to use Boolean vectors for indexing to obtain very concise and readable expressions to retrieve a subset of the vertex or edge set of a graph. For instance, the following command gives you the names of the individuals younger than 30 years in our social network:
+
+```{r}
+V(g)[age < 30]$name
+```
+
+Edges can be selected based on attributes just like vertices. As mentioned above, the standard way to get edges is E. Moreover, there are a few special structural properties for selecting edges.
+
+Using .from() allows you to filter the edge sequence based on the source vertices of the edges. For instance, to select all the edges originating from Carmina (who has vertex index 3):
+
+```{r}
+E(g)[.from(3)]
+```
+```{r}
+E(g)[.from("Carmina")]
+```
+
+Using .to() filters edge sequences based on the target vertices. This is different from .from() if the graph is directed, while it gives the same answer for undirected graphs. Using .inc() selects only those edges that are incident on a single vertex or at least one of the vertices, irrespective of the edge directions.
+
+The %--% operator can be used to select edges between specific groups of vertices, ignoring edge directions in directed graphs. For instance, the following expression selects all the edges between Carmina (vertex index 3), Nang (vertex index 5) and Samira (vertex index 6):
+```{r}
+E(g)[3:5 %--% 5:6]
+```
+
+## degree
+Perhaps the simplest property one can think of is the degree. The degree of a vertex equals the number of edges adjacent to it. In case of directed networks, we can also define in-degree (the number of edges pointing towards the vertex) and out-degree (the number of edges originating from the vertex). igraph is able to calculate all of them using a simple syntax:
+
+```{r}
+degree(att)
+```
+f the graph was directed, we would have been able to calculate the in- and out-degrees separately using degree(mode = "in") and degree(mode = "out"). You can also pass a single vertex ID or a list of vertex IDs to degree() if you want to calculate the degrees for only a subset of vertices:
+```{r}
+degree(att, 7)
+degree(att, v = c(3, 4, 5))
+
+```
+Most functions that accept vertex IDs also accept vertex names (the values of the name vertex attribute) as long as the names are unique:
+```{r}
+degree(g, v = c("Carmina", "Moshe", "Nang"))
+degree(g, "Bruno")
+```
+
+Imagine that in a given social network, you want to find out who has the largest degree. You can do that with the tools presented so far and the which.max() function:
+```{r}
+which.max(degree(att))
+```
+
+
+## edge betweenness
+```{r}
+
+edge_betweenness(g)
+```
+
+Now we can also figure out which connections have the highest betweenness centrality:
+```{r}
+ebs <- edge_betweenness(g)
+as_edgelist(g)[ebs == max(ebs), ]
+```
+
+## adjacency way of rpzing graph
+
+The adjacency matrix is another way to represent a graph. In an adjacency matrix, rows and columns are labeled by graph vertices, and the elements of the matrix indicate the number of edges between vertices i and j. The adjacency matrix for the example graph is:
+```{r}
+as_adjacency_matrix(att)
+```
+
+For example, Carmina (1, 0, 0, 1, 1, 1, 0) is directly connected to Alejandra (who has vertex index 1), Moshe (index 4), Nang (index 5) and Samira (index 6), but not to Bruno (index 2) or to Ibrahim (index 7).
+
+## Plot
+
+
+```{r}
+plot(
+  nom_graph,
+  margin = espace que tu veux autour,
+  layout = layout,
+  main = "Titre")
+```
+si tu utilises un layout tu PEUX le définir à priori (voir partie layout)
+
+```{r}
+layout <- layout_with_kk(nom_graph)
+```
+### adding colors
+To improve the visuals, a trivial addition would be to color the vertices according to the gender. We should also try to place the labels slightly outside the vertices to improve readability:
+(example)
+```{r}
+V(att)$color <- ifelse(V(att)$gender == "m", "yellow", "red")
+plot(
+  att,
+  layout = layout,
+  vertex.label.dist = 3.5,
+  main = "Social network - with genders as colors"
+)
+```
+AUTRE MANIERE DE FAIRE
+
+
+
+You can also treat the gender attribute as a factor and provide the colors with an argument to plot(), which takes precedence over the color vertex attribute. Colors will be assigned automatically to levels of a factor:
+```{r}
+plot(att, layout = layout, vertex.label.dist = 3.5, vertex.color = as.factor(V(att)$gender))
+```
+### thick lines
+As seen above with the vertex.color argument, you can specify visual properties as arguments to plot instead of using vertex or edge attributes. The following plot shows the formal ties with thick lines while informal ones with thin lines: avec edge.width
+```{r}
+plot(att,
+  layout = layout,
+  vertex.label.dist = 3.5,
+  vertex.size = 20,
+  vertex.color = ifelse(V(att)$gender == "m", "yellow", "red"),
+  edge.width = ifelse(E(att)$is_formal, 5, 1)
+)
+```
+### résumé visuel/attributes
+This latter approach is preferred if you want to keep the properties of the visual representation of your graph separate from the graph itself.
+
+In summary, there are special vertex and edge properties that correspond to the visual representation of the graph. These attributes override the default settings of igraph (i.e color, weight, name, shape, layout, etc.). The following two tables summarise the most frequently used visual attributes for vertices and edges, respectively:
+https://r.igraph.org/articles/igraph.html#vertex-attributes-controlling-graph-plots
+https://r.igraph.org/articles/igraph.html#edge-attributes-controlling-graph-plots
+
+
+# Layouts
+The layout functions in igraph always start with layout. The following table summarises them:
+
+## list de layouts
+layout_randomly 	Places the vertices completely randomly
+layout_in_circle 	Deterministic layout that places the vertices on a circle
+layout_on_sphere 	Deterministic layout that places the vertices evenly on the surface of a sphere
+layout_with_drl 	The Drl (Distributed Recursive Layout) algorithm for large graphs
+layout_with_fr 	Fruchterman-Reingold force-directed algorithm
+layout_with_kk 	Kamada-Kawai force-directed algorithm
+layout_with_lgl 	The LGL (Large Graph Layout) algorithm for large graphs
+layout_as_tree 	Reingold-Tilford tree layout, useful for (almost) tree-like graphs
+layout_nicely 	Layout algorithm that automatically picks one of the other algorithms based on certain properties of the graph
+
+## layout algo
+Layout algorithms can be called directly with a graph as its first argument. They will return a matrix with two columns and as many rows as the number of vertices in the graph; each row will correspond to the position of a single vertex, ordered by vertex IDs. Some algorithms have a 3D variant; in this case they return 3 columns instead of 2.
+
+```{r}
+layout <- layout_with_kk(g)
+```
+Some layout algorithms take additional arguments; for instance, when laying out a graph as a tree, it might make sense to specify which vertex is to be placed at the root of the layout:
+```{r}
+layout <- layout_as_tree(g, root = 2)
+```
+## drawing a graph with layout (examples)
+(The layout argument also accepts functions; in this case, the function will be called with the graph as its first argument. This makes it possible to just pass the name of a layout function directly, without creating a layout variable)
+
+We can plot our imaginary social network with the Kamada-Kawai layout algorithm as follows:
+
+```{r}
+layout <- layout_with_kk(att)
+```
+
+```{r}
+plot(att, layout = layout, main = "Social network with the Kamada-Kawai layout algorithm")
+```
+```{r}
+plot(
+  att,
+  layout = layout_with_fr,
+  main = "Social network with the Fruchterman-Reingold layout algorithm"
+)
+```
+
+
+```{r}
+??igraph
+```
+
+```{r}
+install.packages("igraph")
+```
+
+
+terminologie (verteces) https://fr.wikipedia.org/wiki/Sommet_(g%C3%A9om%C3%A9trie)
+
+More details on dependencies, requirements, and troubleshooting on installation are found on the main documentation page.https://r.igraph.org/
+# Package
+```{r}
+library(igraph)
+library(magrittr)
+```
+
+# Différentes manière de créer graphique
+
+## Make empty graph
+```{r}
+
+g <- make_empty_graph()
+g
+```
+
+The most common way to create a graph is make_graph(), which constructs a network based on specified edges. For example, to make a graph with 10 nodes (numbered 1 to 10) and two edges connecting nodes 1-2 and 1-5:
+
+## Make graph
+```{r}
+g <- make_graph(edges = c(1, 2, 1, 5), n = 10, directed = FALSE)
+summary(g)
+plot(g, layout=layout_nicely)
+
+```
+The same function make_graph() can create some notable graphs by just specifying their name. For example you can create the graph that represents the social network of Zachary’s karate club, that shows the friendship between 34 members of a karate club at a US university in the 1970s:
+```{r}
+g <- make_graph("Zachary")
+plot(g)
+```
+
+### social networks with attributes
+```{r}
+att <- make_graph(
+  ~ Alice - Boris:Himari:Moshe, Himari - Alice:Nang:Moshe:Samira,
+  Ibrahim - Nang:Moshe, Nang - Samira
+)
+plot(att)
+
+```
+#### V et E
+Each vertex represents a person, so we want to store ages, genders and types of connection between two people (is_formal() refers to whether a connection between one person or another is formal or informal, respectively colleagues or friends). The $ operator is a shortcut to get and set graph attributes. It is shorter and just as readable as graph_attr() and set_graph_attr().
+
+```{r}
+V(att)$age <- c(25, 31, 18, 23, 47, 22, 50)
+V(att)$gender <- c("f", "m", "f", "m", "m", "f", "m")
+E(att)$is_formal <- c(FALSE, FALSE, TRUE, TRUE, TRUE, FALSE, TRUE, FALSE, FALSE)
+summary(att)
+plot(att)
+```
+V() and E() are the standard way to obtain a sequence of all vertices and edges, respectively. This assigns an attribute to all vertices/edges at once.
+
+To assign or modify an attribute for a single vertex/edge:
+```{r}
+E(g)$is_formal
+```
+
+```{r}
+E(g)$is_formal[1] <- TRUE
+E(g)$is_formal
+```
+
+#### set vertex attr et set edge attr:
+
+Another way to generate our social network is with the use of set_vertex_attr() and set_edge_attr() and the operator %>%:
+```{r}
+att <- make_graph(
+  ~ Alice - Boris:Himari:Moshe, Himari - Alice:Nang:Moshe:Samira,
+  Ibrahim - Nang:Moshe, Nang - Samira
+) %>%
+  set_vertex_attr("age", value = c(25, 31, 18, 23, 47, 22, 50)) %>%
+  set_vertex_attr("gender", value = c("f", "m", "f", "m", "m", "f", "m")) %>%
+  set_edge_attr("is_formal", value = c(FALSE, FALSE, TRUE, TRUE, TRUE, FALSE, TRUE, FALSE, FALSE))
+summary(att)
+```
+
+#### assigner att autres
+Attribute values can be set to any R object, but note that storing the graph in some file formats might result in the loss of complex attribute values. Vertices, edges and the graph itself can all be used to set attributes, for instance to add a date to the graph
+```{r}
+g$date <- c("2022-02-11")
+graph_attr(g, "date")
+```
+To assign attributes to a subset of vertices or edges, you can use:
+```{r}
+V(g)$name[1:3] <- c("Alejandra", "Bruno", "Carmina")
+V(g)
+```
+
+
+## Graph from literal
+
+(voir chordal graph)
+```{r}
+g1 <- graph_from_literal(
+  A - B:C:I, B - A:C:D,
+  C - A:B:E:H,
+  D - B:E:F,
+  E - C:D:F:H,
+  F - D:E:G,
+  G - F:H,
+  H - C:E:G:I,
+  I - A:H
+)
+plot(g1)
+```
+
+## Make tree (always same)
+This generates a regular tree graph with 127 vertices, each vertex having two children. No matter how many times you call make_tree(), the generated graph will always be the same if you use the same parameters:
+
+```{r}
+graph1 <- make_tree(127, 2, mode = "undirected")
+summary(graph1)
+plot(graph1)
+```
+### comparer graph
+(ici montre que si tu utilises les m^mes paramètres les graph générés seront toujours les mêmes)
+```{r}
+graph2 <- make_tree(127, 2, mode = "undirected")
+identical_graphs(graph1, graph2)
+
+```
+
+## sample grg
+Other functions generate graphs stochastically, which means they produce a different graph each time. For instance sample_grg():
+```{r}
+graph1 <- sample_grg(100, 0.2)
+summary(graph1)
+plot(graph1)
+```
+
+# Gérer le graph
+## Ajouter des Vertex (noeuds) et des edges (liens)
+Let’s continue working with the Karate club graph. To add one or more vertices to an existing graph, use add_vertices():
+```{r}
+g <- add_vertices(g, 3)
+plot(g)
+```
+Similarly, to add edges you can use add_edges():
+Edges are added by specifying the source and target vertex IDs for each edge. This call added three edges, one connecting vertices 1 and 35, one connecting vertices 1 and 36, and one connecting vertices 34 and 37.
+```{r}
+g <- add_edges(g, edges = c(1, 35, 1, 36, 34, 37))
+plot(g)
+```
+
+In addition to the add_vertices() and add_edges() functions, the plus operator can be used to add vertices or edges to graph. The actual operation that is performed depends on the type of the right hand side argument:
+
+```{r}
+g <- g + edges(c(1, 35, 1, 36, 34, 37))
+plot(g)
+```
+You can add a single vertex/edge at a time using add_vertex() and add_edge() (singular).
+
+Warning: If you need to add multiple edges to a graph, it is much more efficient to call add_edges() once rather than repeatedly calling add_edge() with a single new edge. The same applies when deleting edges and vertices.
+
+If you try to add edges to vertices with invalid IDs (i.e., you try to add an edge to vertex 38 when the graph has only 37 vertices), igraph shows an error:
+```{r}
+g <- add_edges(g, edges = c(38, 37))
+```
+Let us add some more vertices and edges to our graph. In igraph we can use the magrittr package, which provides a mechanism for chaining commands with the operator
+
+
+```{r}
+g <- g %>%
+  add_edges(edges = c(1, 34)) %>%
+  add_vertices(3) %>%
+  add_edges(edges = c(38, 39, 39, 40, 40, 38, 40, 37))
+g
+plot(g)
+```
+## Supprimer edge
+We now have an undirected graph with 40 vertices and 86 edges. Vertex and edge IDs are always contiguous, so if you delete a vertex all subsequent vertices will be renumbered. When a vertex is renumbered, edges are not renumbered, but their source and target vertices will be. Use delete_vertices() and delete_edges() to perform these operations. For instance, to delete the edge connecting vertices 1-34, get its ID and then delete it:
+```{r}
+edge_id_to_delete <- get_edge_ids(g, c(1, 34))
+edge_id_to_delete
+```
+
+
+```{r}
+g <- delete_edges(g, edge_id_to_delete)
+plot(g)
+```
+# Types de graphs spéciaux
+## Broken ring
+s an example, to create a broken ring:
+```{r}
+g <- make_ring(10) %>% delete_edges("10|1")
+plot(g)
+
+```
+The example above shows that you can also refer to edges with strings containing the IDs of the source and target vertices, connected by a pipe symbol |. "10|1" in the above example means the edge that connects vertex 10 to vertex 1. Of course you can also use the edge IDs directly, or retrieve them with the get_edge_ids() function:
+
+```{r}
+g <- make_ring(5)
+g <- delete_edges(g, get_edge_ids(g, c(1, 5, 4, 5)))
+plot(g)
+```
+# Chordal
+As another example, let’s make a chordal graph. Remember that a graph is chordal (or triangulated) if each of its cycles of four or more nodes has a chord, which is an edge joining two nodes that are not adjacent in the cycle. First, let’s create the initial graph using graph_from_literal():
+
+```{r}
+g1 <- graph_from_literal(
+  A - B:C:I, B - A:C:D,
+  C - A:B:E:H,
+  D - B:E:F,
+  E - C:D:F:H,
+  F - D:E:G,
+  G - F:H,
+  H - C:E:G:I,
+  I - A:H
+)
+plot(g1)
+```
+
+In the example above, the : operator was used to define vertex sets. If an edge operator connects two vertex sets, then every vertex from the first set will be connected to every vertex in the second set. Then we use is_chordal() to evaluate if our graph is chordal and to search what edges are missing to fill-in the graph:
+```{r}
+is_chordal(g1, fillin = TRUE)
+
+```
+We can then add the edges required to make the initial graph chordal in a single line:
+
+
+```{r}
+chordal_graph <- add_edges(g1, is_chordal(g1, fillin = TRUE)$fillin)
+plot(chordal_graph)
+```
+
+
+# Fonctions utiles
+## comparer des graphiques
+```{r}
+identical_graphs(graph1, graph2)#renvoie un bool
+```
+A slightly looser way to check if the graphs are equivalent is via isomorphic. Two graphs are said to be isomorphic if they have the same number of components (vertices and edges) and maintain a one-to-one correspondence between vertices and edges, that is to say, they are connected in the same way.
+
+```{r}
+isomorphic(graph1, graph2) #renvoie bool
+
+```
+Checking for isomorphism can take a while for large graphs (in this case, the answer can quickly be given by checking the degree sequence of the two graphs). identical_graph() is a stricter criterion than isomorphic(): the two graphs must have the same list of vertices and edges, in exactly the same order, with same directedness, and the two graphs must also have identical graph, vertex and edge attributes.
+
+## retrieve/delete attributes
+Voir social networks with attributes
+
+To retrieve attributes, you can also use graph_attr(), vertex_attr(), and edge_attr(). To find the ID of a vertex you can use the function match():
+```{r}
+match(c("Ibrahim"), V(att)$name)
+```
+
+To delete attributes:
+```{r}
+g <- delete_vertex_attr(g, "gender")
+V(g)$gender
+```
+
+
+
+## select edges and vetrices
+Of course, it is possible to select vertices or edges by positional indices:
+```{r}
+seq <- V(graph)[2, 3, 7]
+seq
+```
+```{r}
+seq <- seq[1, 3] # filtering an existing vertex set
+seq
+```
+
+Attribute names can also be used as-is within the indexing brackets of V() and E(). This can be combined with R’s ability to use Boolean vectors for indexing to obtain very concise and readable expressions to retrieve a subset of the vertex or edge set of a graph. For instance, the following command gives you the names of the individuals younger than 30 years in our social network:
+
+```{r}
+V(g)[age < 30]$name
+```
+
+Edges can be selected based on attributes just like vertices. As mentioned above, the standard way to get edges is E. Moreover, there are a few special structural properties for selecting edges.
+
+Using .from() allows you to filter the edge sequence based on the source vertices of the edges. For instance, to select all the edges originating from Carmina (who has vertex index 3):
+
+```{r}
+E(g)[.from(3)]
+```
+```{r}
+E(g)[.from("Carmina")]
+```
+
+Using .to() filters edge sequences based on the target vertices. This is different from .from() if the graph is directed, while it gives the same answer for undirected graphs. Using .inc() selects only those edges that are incident on a single vertex or at least one of the vertices, irrespective of the edge directions.
+
+The %--% operator can be used to select edges between specific groups of vertices, ignoring edge directions in directed graphs. For instance, the following expression selects all the edges between Carmina (vertex index 3), Nang (vertex index 5) and Samira (vertex index 6):
+```{r}
+E(g)[3:5 %--% 5:6]
+```
+
+## degree
+Perhaps the simplest property one can think of is the degree. The degree of a vertex equals the number of edges adjacent to it. In case of directed networks, we can also define in-degree (the number of edges pointing towards the vertex) and out-degree (the number of edges originating from the vertex). igraph is able to calculate all of them using a simple syntax:
+
+```{r}
+degree(att)
+```
+f the graph was directed, we would have been able to calculate the in- and out-degrees separately using degree(mode = "in") and degree(mode = "out"). You can also pass a single vertex ID or a list of vertex IDs to degree() if you want to calculate the degrees for only a subset of vertices:
+```{r}
+degree(att, 7)
+degree(att, v = c(3, 4, 5))
+
+```
+Most functions that accept vertex IDs also accept vertex names (the values of the name vertex attribute) as long as the names are unique:
+```{r}
+degree(g, v = c("Carmina", "Moshe", "Nang"))
+degree(g, "Bruno")
+```
+
+Imagine that in a given social network, you want to find out who has the largest degree. You can do that with the tools presented so far and the which.max() function:
+```{r}
+which.max(degree(att))
+```
+
+
+## edge betweenness
+```{r}
+
+edge_betweenness(g)
+```
+
+Now we can also figure out which connections have the highest betweenness centrality:
+```{r}
+ebs <- edge_betweenness(g)
+as_edgelist(g)[ebs == max(ebs), ]
+```
+
+## adjacency way of rpzing graph
+
+The adjacency matrix is another way to represent a graph. In an adjacency matrix, rows and columns are labeled by graph vertices, and the elements of the matrix indicate the number of edges between vertices i and j. The adjacency matrix for the example graph is:
+```{r}
+as_adjacency_matrix(att)
+```
+
+For example, Carmina (1, 0, 0, 1, 1, 1, 0) is directly connected to Alejandra (who has vertex index 1), Moshe (index 4), Nang (index 5) and Samira (index 6), but not to Bruno (index 2) or to Ibrahim (index 7).
+
+## Plot
+
+
+```{r}
+plot(
+  nom_graph,
+  margin = espace que tu veux autour,
+  layout = layout,
+  main = "Titre")
+```
+si tu utilises un layout tu PEUX le définir à priori (voir partie layout)
+
+```{r}
+layout <- layout_with_kk(nom_graph)
+```
+### adding colors
+To improve the visuals, a trivial addition would be to color the vertices according to the gender. We should also try to place the labels slightly outside the vertices to improve readability:
+(example)
+```{r}
+V(att)$color <- ifelse(V(att)$gender == "m", "yellow", "red")
+plot(
+  att,
+  layout = layout,
+  vertex.label.dist = 3.5,
+  main = "Social network - with genders as colors"
+)
+```
+AUTRE MANIERE DE FAIRE
+
+
+
+You can also treat the gender attribute as a factor and provide the colors with an argument to plot(), which takes precedence over the color vertex attribute. Colors will be assigned automatically to levels of a factor:
+```{r}
+plot(att, layout = layout, vertex.label.dist = 3.5, vertex.color = as.factor(V(att)$gender))
+```
+### thick lines
+As seen above with the vertex.color argument, you can specify visual properties as arguments to plot instead of using vertex or edge attributes. The following plot shows the formal ties with thick lines while informal ones with thin lines: avec edge.width
+```{r}
+plot(att,
+  layout = layout,
+  vertex.label.dist = 3.5,
+  vertex.size = 20,
+  vertex.color = ifelse(V(att)$gender == "m", "yellow", "red"),
+  edge.width = ifelse(E(att)$is_formal, 5, 1)
+)
+```
+### résumé visuel/attributes
+This latter approach is preferred if you want to keep the properties of the visual representation of your graph separate from the graph itself.
+
+In summary, there are special vertex and edge properties that correspond to the visual representation of the graph. These attributes override the default settings of igraph (i.e color, weight, name, shape, layout, etc.). The following two tables summarise the most frequently used visual attributes for vertices and edges, respectively:
+https://r.igraph.org/articles/igraph.html#vertex-attributes-controlling-graph-plots
+https://r.igraph.org/articles/igraph.html#edge-attributes-controlling-graph-plots
+
+
+# Layouts
+The layout functions in igraph always start with layout. The following table summarises them:
+
+## list de layouts
+layout_randomly 	Places the vertices completely randomly
+layout_in_circle 	Deterministic layout that places the vertices on a circle
+layout_on_sphere 	Deterministic layout that places the vertices evenly on the surface of a sphere
+layout_with_drl 	The Drl (Distributed Recursive Layout) algorithm for large graphs
+layout_with_fr 	Fruchterman-Reingold force-directed algorithm
+layout_with_kk 	Kamada-Kawai force-directed algorithm
+layout_with_lgl 	The LGL (Large Graph Layout) algorithm for large graphs
+layout_as_tree 	Reingold-Tilford tree layout, useful for (almost) tree-like graphs
+layout_nicely 	Layout algorithm that automatically picks one of the other algorithms based on certain properties of the graph
+
+## layout algo
+Layout algorithms can be called directly with a graph as its first argument. They will return a matrix with two columns and as many rows as the number of vertices in the graph; each row will correspond to the position of a single vertex, ordered by vertex IDs. Some algorithms have a 3D variant; in this case they return 3 columns instead of 2.
+
+```{r}
+layout <- layout_with_kk(g)
+```
+Some layout algorithms take additional arguments; for instance, when laying out a graph as a tree, it might make sense to specify which vertex is to be placed at the root of the layout:
+```{r}
+layout <- layout_as_tree(g, root = 2)
+```
+## drawing a graph with layout (examples)
+(The layout argument also accepts functions; in this case, the function will be called with the graph as its first argument. This makes it possible to just pass the name of a layout function directly, without creating a layout variable)
+
+We can plot our imaginary social network with the Kamada-Kawai layout algorithm as follows:
+
+```{r}
+layout <- layout_with_kk(att)
+```
+
+```{r}
+plot(att, layout = layout, main = "Social network with the Kamada-Kawai layout algorithm")
+```
+```{r}
+plot(
+  att,
+  layout = layout_with_fr,
+  main = "Social network with the Fruchterman-Reingold layout algorithm"
+)
+```
+
