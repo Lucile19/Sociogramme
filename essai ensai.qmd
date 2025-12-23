@@ -1,0 +1,26 @@
+
+```{r}
+library(igraph)
+```
+
+```{r}
+ensai_claire <- make_graph(~Claire - Maxime:Justin:Martin:Quentin,
+  Maxime - Claire:Antoine:Nathan,
+  Justin - Claire:Martin,
+  Martin - Claire:Quentin:Justin,
+  Antoine - Maxime:Nathan,
+  Nathan - Maxime:Antoine,
+  Quentin - Claire:Martin)
+
+V(ensai_claire)$is_claire <- c(1, 0, 0, 0,0, 0, 0)
+V(ensai_claire)$gender <- c("f", "m", "f", "m", "m", "f", "m")
+E(ensai_claire)$is_formal <- c(FALSE, FALSE, TRUE, TRUE, TRUE, FALSE, TRUE, FALSE, FALSE)
+summary(ensai_claire)
+plot(ensai_claire)
+V(ensai_claire)$color <- ifelse(V(ensai_claire)$is_claire == 1, "pink", "red")
+plot(ensai_claire,
+     layout=layout_nicely,
+     vertex.label.dist = 3.5,
+     main="Claire est le centre du monde je crois bien")
+```
+
