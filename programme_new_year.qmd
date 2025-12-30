@@ -1,0 +1,120 @@
+```{r}
+install.packages("visNetwork")
+install.packages("dplyr")
+install.packages("tidyverse")
+install.packages("pandoc")
+library(igraph)
+library(visNetwork)
+library(dplyr)
+library(tidyverse)
+library(pandoc)
+```
+
+# Sociogramme toutes relations
+
+## On définit les edges
+
+A partir d'un dataframe aux variables ATTENTION NOM AU FORMAT PRENOM N
+
+(il faut surtout pas de doublons je suis pas passée par des )
+
+to : str (nom de la personne qu'on interroge)
+
+from : str
+
+type : str dans \[fratrie, cousin.es, ami.es, relation, ennemi.es, filiation\]
+
+t'as amené ? : bool (true si la personne t'as invité ou si c'est toi qui l'as invité)
+
+remarque : str (s'affichera sur le lien)
+
+colour : vide :D
+
+### charger doc
+
+```{r}
+edgesdf <- readxl::read_excel('socio_new_year.xlsx')
+head(edgesdf)
+```
+
+### (gérer les doublons si ça pose pb)
+
+```{r}
+# s'il existe 2 couples to/from identiques tu en supprimes un en fonction de type ? au pif ?
+```
+
+### ajouter colonnes colour
+
+```{r}
+
+edgesdf$Colour <- fct_recode(
+    edgesdf$Type,
+    "black"='ennemi.es',
+    "purple"='filiation',
+    "blue"='ami.es' ,
+    "orange"='cousin.es',
+    'pink'='relation' ,
+    "green"='fratrie')
+head(edgesdf)
+```
+
+### définir edge
+
+```{r}
+
+edges <- data.frame(
+  from = edgesdf$From,
+  to = edgesdf$To,
+  label = edgesdf$Remarque,                                 # add labels on edges
+  #length = c(100,500),                                        # length
+  #arrows = c("to", "from", "middle", "middle;to"),            # arrows
+  #dashes = c(TRUE, FALSE),                                    # dashes
+  title = edgesdf$Type,                            # tooltip (html or character)
+  #, smooth = c(FALSE, TRUE),
+  color = edgesdf$Colour,
+  width= 2)
+# smooth
+  #shadow = c(FALSE, TRUE, FALSE, TRUE)
+```
+
+## Définir les nodes à partir des edges
+
+```{r}
+liste_noms= union(edgesdf$To, edgesdf$From)
+
+nodes <- data.frame(id = unique(liste_noms),
+                    label = unique(liste_noms),                                 # add labels on nodes
+                    #group = c("GrA", "GrB"),                                     # add groups on nodes
+                    #value = 1:10,                                                # size adding value
+                    shape = 'star',                   # control shape of nodes
+                    title = unique(liste_noms),
+                    #,
+                    # tooltip (html or character)
+                    color = 'black')
+                    # color
+                    #shadow = c(FALSE, TRUE, FALSE, TRUE, TRUE))
+head(nodes)
+```
+
+# Visualisation
+
+attention ajouter la légende
+
+```{r}
+visNetwork(nodes, edges, width = "100%") %>%
+  visIgraphLayout(layout = "layout_nicely")%>%
+  visLegend(useGroups = FALSE,
+            addEdges = data.frame(
+              label = c('ennemi.es','filiation','ami.e','cousin.e','relation','fratrie','compliqué'),
+              color = c("black", "purple","blue","orange", 'pink',"green", "grey")))
+
+
+```
+
+problèmes :
+
+-   moches
+
+-   relations dans tableau calent pas
+
+-
